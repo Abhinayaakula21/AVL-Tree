@@ -1,0 +1,412 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AVL Tree Visualizer — Enhanced</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #fff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #0066ff;
+      --node-stroke: #1f2937;
+      --line: #6b7280;
+    }
+    [data-theme="dark"] {
+      --bg: #0b1220;
+      --panel: #071022;
+      --text: #e6eef8;
+      --muted: #9aa9bf;
+      --accent: #4ea8ff;
+      --node-stroke: #cbd5e1;
+      --line: #94a3b8;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    input[type="text"] {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    button.ghost {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--text);
+    }
+
+    svg#tree {
+      width: 100%;
+      height: 500px;
+      background: var(--panel);
+      border: 1px solid #ccc;
+      margin-top: 15px;
+    }
+
+    .node-label {
+      fill: white;
+      font-size: 13px;
+      font-weight: bold;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    .node-sub {
+      fill: white;
+      font-size: 10px;
+      text-anchor: middle;
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <header>
+    <h1>AVL Tree Visualizer</h1>
+    <label>
+      <input type="checkbox" id="showMeta" /> Show Balancing Info
+    </label>
+  </header>
+
+  <div class="controls">
+    <input id="numInput" type="text" placeholder="Enter numbers e.g. 10 20 30" />
+    <button id="insertBtn">Insert</button>
+    <button id="deleteBtn" class="ghost">Delete</button>
+    <button id="randomBtn" class="ghost">Random</button>
+    <button id="resetBtn" class="ghost">Reset</button>
+    <button id="toggleTheme" class="ghost">Toggle Theme</button>
+  </div>
+
+  <svg id="tree"></svg>
+
+  <div class="controls">
+    <button id="inorderBtn" class="ghost">Inorder</button>
+    <button id="preorderBtn" class="ghost">Preorder</button>
+    <button id="postorderBtn" class="ghost">Postorder</button>
+    <button id="levelorderBtn" class="ghost">Level Order</button>
+  </div>
+
+  <div id="traversalOutput" style="margin-top:10px;color:var(--muted);"></div>
+
+  <script>
+    class Node {
+      constructor(data) {
+        this.data = data;
+        this.height = 1;
+        this.left = null;
+        this.right = null;
+        this.color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+        this._id = Node._nextId++;
+      }
+    }
+    Node._nextId = 1;
+
+    const treeSVG = document.getElementById("tree");
+    const nodeRadius = 24;
+    let avlRoot = null;
+
+    function height(n) {
+      return n ? n.height : 0;
+    }
+
+    function getBF(n) {
+      return n ? height(n.left) - height(n.right) : 0;
+    }
+
+    function updateHeight(n) {
+      n.height = 1 + Math.max(height(n.left), height(n.right));
+    }
+
+    function rightRotate(y) {
+      const x = y.left;
+      const T2 = x.right;
+      x.right = y;
+      y.left = T2;
+      updateHeight(y);
+      updateHeight(x);
+      return x;
+    }
+
+    function leftRotate(x) {
+      const y = x.right;
+      const T2 = y.left;
+      y.left = x;
+      x.right = T2;
+      updateHeight(x);
+      updateHeight(y);
+      return y;
+    }
+
+    function insertNode(root, key) {
+      if (!root) return new Node(key);
+      if (key < root.data) root.left = insertNode(root.left, key);
+      else if (key > root.data) root.right = insertNode(root.right, key);
+      else return root;
+
+      updateHeight(root);
+      const bf = getBF(root);
+
+      if (bf > 1 && key < root.left.data) return rightRotate(root);
+      if (bf < -1 && key > root.right.data) return leftRotate(root);
+      if (bf > 1 && key > root.left.data) {
+        root.left = leftRotate(root.left);
+        return rightRotate(root);
+      }
+      if (bf < -1 && key < root.right.data) {
+        root.right = rightRotate(root.right);
+        return leftRotate(root);
+      }
+      return root;
+    }
+
+    function minValueNode(node) {
+      let current = node;
+      while (current.left) current = current.left;
+      return current;
+    }
+
+    function deleteNode(root, key) {
+      if (!root) return root;
+      if (key < root.data) root.left = deleteNode(root.left, key);
+      else if (key > root.data) root.right = deleteNode(root.right, key);
+      else {
+        if (!root.left) return root.right;
+        else if (!root.right) return root.left;
+        let temp = minValueNode(root.right);
+        root.data = temp.data;
+        root.right = deleteNode(root.right, temp.data);
+      }
+
+      updateHeight(root);
+      const bf = getBF(root);
+      if (bf > 1 && getBF(root.left) >= 0) return rightRotate(root);
+      if (bf > 1 && getBF(root.left) < 0) {
+        root.left = leftRotate(root.left);
+        return rightRotate(root);
+      }
+      if (bf < -1 && getBF(root.right) <= 0) return leftRotate(root);
+      if (bf < -1 && getBF(root.right) > 0) {
+        root.right = rightRotate(root.right);
+        return leftRotate(root);
+      }
+      return root;
+    }
+
+    function renderTree(root) {
+      treeSVG.innerHTML = "";
+      if (!root) return;
+      const positions = new Map();
+      let index = 0;
+      const xs = new Map();
+      function inorder(n) {
+        if (!n) return;
+        inorder(n.left);
+        xs.set(n._id, ++index);
+        inorder(n.right);
+      }
+      inorder(root);
+      const width = treeSVG.clientWidth || 800;
+      const margin = 40;
+      const usable = width - margin * 2;
+      const spacing = usable / Math.max(1, index);
+
+      function setXY(n, depth = 0) {
+        if (!n) return;
+        const x = margin + (xs.get(n._id) - 0.5) * spacing;
+        const y = 50 + depth * 80;
+        positions.set(n._id, { x, y });
+        setXY(n.left, depth + 1);
+        setXY(n.right, depth + 1);
+      }
+      setXY(root);
+
+      function drawEdges(n) {
+        if (!n) return;
+        const p = positions.get(n._id);
+        if (n.left) {
+          const c = positions.get(n.left._id);
+          drawLine(p.x, p.y, c.x, c.y);
+          drawEdges(n.left);
+        }
+        if (n.right) {
+          const c = positions.get(n.right._id);
+          drawLine(p.x, p.y, c.x, c.y);
+          drawEdges(n.right);
+        }
+      }
+      drawEdges(root);
+
+      function drawLine(x1, y1, x2, y2) {
+        const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        l.setAttribute("x1", x1);
+        l.setAttribute("y1", y1);
+        l.setAttribute("x2", x2);
+        l.setAttribute("y2", y2);
+        l.setAttribute("stroke", "var(--line)");
+        l.setAttribute("stroke-width", "2");
+        treeSVG.appendChild(l);
+      }
+
+      function drawNodes(n) {
+        if (!n) return;
+        const { x, y } = positions.get(n._id);
+        drawNodeCircle(x, y, n);
+        drawNodes(n.left);
+        drawNodes(n.right);
+      }
+      drawNodes(root);
+    }
+
+    // ✅ Balanced info inside circle
+    function drawNodeCircle(x, y, node) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.setAttribute("transform", `translate(${x},${y})`);
+
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("r", nodeRadius);
+      c.setAttribute("fill", node.color);
+      c.setAttribute("stroke", "var(--node-stroke)");
+      c.setAttribute("stroke-width", "1.5");
+      g.appendChild(c);
+
+      const val = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      val.setAttribute("y", 3);
+      val.setAttribute("class", "node-label");
+      val.textContent = node.data;
+      g.appendChild(val);
+
+      const showMeta = document.getElementById("showMeta");
+      if (showMeta && showMeta.checked) {
+        const meta = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        meta.setAttribute("y", nodeRadius * 0.7); // stays inside bottom area
+        meta.setAttribute("class", "node-sub");
+        meta.textContent = `h:${node.height} bf:${getBF(node)}`;
+        g.appendChild(meta);
+      }
+
+      treeSVG.appendChild(g);
+    }
+
+    // Traversals
+    function inorder(n, arr = []) {
+      if (!n) return arr;
+      inorder(n.left, arr);
+      arr.push(n.data);
+      inorder(n.right, arr);
+      return arr;
+    }
+    function preorder(n, arr = []) {
+      if (!n) return arr;
+      arr.push(n.data);
+      preorder(n.left, arr);
+      preorder(n.right, arr);
+      return arr;
+    }
+    function postorder(n, arr = []) {
+      if (!n) return arr;
+      postorder(n.left, arr);
+      postorder(n.right, arr);
+      arr.push(n.data);
+      return arr;
+    }
+    function levelorder(n) {
+      if (!n) return [];
+      const q = [n],
+        res = [];
+      while (q.length) {
+        const k = q.shift();
+        res.push(k.data);
+        if (k.left) q.push(k.left);
+        if (k.right) q.push(k.right);
+      }
+      return res;
+    }
+
+    // UI actions
+    document.getElementById("insertBtn").onclick = () => {
+      const vals = document
+        .getElementById("numInput")
+        .value.split(/[\s,]+/)
+        .map(Number)
+        .filter((x) => !isNaN(x));
+      vals.forEach((v) => (avlRoot = insertNode(avlRoot, v)));
+      renderTree(avlRoot);
+    };
+
+    document.getElementById("deleteBtn").onclick = () => {
+      const val = parseInt(document.getElementById("numInput").value);
+      if (!isNaN(val)) avlRoot = deleteNode(avlRoot, val);
+      renderTree(avlRoot);
+    };
+
+    document.getElementById("resetBtn").onclick = () => {
+      avlRoot = null;
+      renderTree(null);
+    };
+
+    document.getElementById("randomBtn").onclick = () => {
+      avlRoot = null;
+      const arr = Array.from({ length: 7 }, () =>
+        Math.floor(Math.random() * 100)
+      );
+      arr.forEach((v) => (avlRoot = insertNode(avlRoot, v)));
+      renderTree(avlRoot);
+    };
+
+    document.getElementById("toggleTheme").onclick = () => {
+      const body = document.body;
+      const dark = body.getAttribute("data-theme") === "dark";
+      body.setAttribute("data-theme", dark ? "light" : "dark");
+    };
+
+    // Traversal buttons
+    document.getElementById("inorderBtn").onclick = () =>
+      (document.getElementById("traversalOutput").textContent =
+        "Inorder: " + inorder(avlRoot).join(" "));
+    document.getElementById("preorderBtn").onclick = () =>
+      (document.getElementById("traversalOutput").textContent =
+        "Preorder: " + preorder(avlRoot).join(" "));
+    document.getElementById("postorderBtn").onclick = () =>
+      (document.getElementById("traversalOutput").textContent =
+        "Postorder: " + postorder(avlRoot).join(" "));
+    document.getElementById("levelorderBtn").onclick = () =>
+      (document.getElementById("traversalOutput").textContent =
+        "Level order: " + levelorder(avlRoot).join(" "));
+
+    // Re-render when checkbox toggled
+    document.getElementById("showMeta").onchange = () => renderTree(avlRoot);
+
+    renderTree(null);
+  </script>
+</body>
+</html>
